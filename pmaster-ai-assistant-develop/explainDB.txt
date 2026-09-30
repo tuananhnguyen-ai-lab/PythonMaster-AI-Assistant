@@ -1,0 +1,5 @@
+
+
+1 User có nhiều Conversations: Bảng conversations có chứa cột user_id làm khóa ngoại (Foreign Key) trỏ tới bảng users, cho phép một người dùng tạo và quản lý nhiều phiên chat riêng biệt.
+
+1 Conversation có nhiều Messages: Bảng messages có chứa cột conversation_id làm khóa ngoại trỏ tới bảng conversations, giúp mỗi phiên chat lưu trữ một chuỗi lịch sử gồm nhiều tin nhắn qua lại (cả của người dùng lẫn của AI).

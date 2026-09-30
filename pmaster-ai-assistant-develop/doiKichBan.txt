@@ -1,0 +1,16 @@
+Cách tích hợp kịch bản có sẵn (Scenarios) vào code AI
+Hoàn toàn có thể làm được, và đây là yêu cầu rất phổ biến trong các dự án thực tế để ép AI trả lời đúng định hướng doanh nghiệp thay vì tự phát ngôn linh tinh. Có 2 cách chính để đưa kịch bản vào code Python hiện tại của bạn:
+
+Cách 1: Mở rộng system_instruction (Phù hợp với kịch bản dạng quy tắc, chính sách, hoặc FAQ):
+Bạn bổ sung trực tiếp các kịch bản xử lý tình huống vào phần cấu hình nhân cách của AI trong file app.py:
+
+Python
+system_instruction = """
+Bạn là trợ lý ảo thông minh chuyên trách Hệ thống Quản lý Học tập (LMS). 
+Hãy tuân thủ nghiêm ngặt các kịch bản xử lý sau đây khi gặp câu hỏi tương ứng:
+1. Nếu học viên hỏi về học phí: Phải trả lời theo mẫu: "Học phí được chia làm 3 đợt đóng. Bạn vui lòng kiểm tra chi tiết trên cổng thông tin sinh viên."
+2. Nếu học viên khiếu nại điểm số: Hướng dẫn họ làm đơn khiếu nại gửi lên phòng đào tạo trong vòng 7 ngày.
+Đối với các câu hỏi khác, hãy trả lời ngắn gọn, rõ ràng, hỗ trợ tra cứu tài liệu và lịch học.
+"""
+Cách 2: Sử dụng Few-shot Prompting (Phù hợp khi muốn AI bắt chước đúng văn mẫu, giọng điệu cụ thể):
+Nếu team của bạn soạn sẵn các cặp câu hỏi - câu trả lời mẫu, bạn có thể nhét thẳng các mẫu này vào mảng history ngay từ khi khởi tạo phiên chat, giúp AI định hình phong cách phản hồi chuẩn xác theo ý muốn trước khi bắt đầu trò chuyện với người dùng.

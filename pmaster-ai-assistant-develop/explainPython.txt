@@ -1,0 +1,87 @@
+from flask import Flask, request, jsonify: Nạp các thành phần cốt lõi của Flask gồm Flask (để khởi tạo ứng dụng web), request (để nhận dữ liệu từ HTTP request gửi tới), và jsonify (để đóng gói dữ liệu trả về dưới định dạng JSON).
+
+from flask_cors import CORS: Nạp thư viện CORS giúp mở quyền cho phép các ứng dụng Frontend ở tên miền hoặc cổng khác gọi được API này.
+
+from google import genai: Nạp bộ thư viện SDK chính thức của Google GenAI để giao tiếp với các mô hình trí tuệ nhân tạo.
+
+from google.genai import types: Nạp module chứa các cấu trúc dữ liệu và kiểu cấu hình của Google GenAI (dùng cho việc thiết lập system instruction).
+
+import pymysql: Nạp thư viện kết nối và thao tác với cơ sở dữ liệu MySQL bằng Python.
+
+app = Flask(__name__): Khởi tạo ứng dụng Flask chính thức và lưu vào biến app.
+
+CORS(app): Kích hoạt cơ chế CORS cho toàn bộ ứng dụng Flask.
+
+DB_CONFIG = { ... }: Khai báo một từ điển (dictionary) chứa thông tin kết nối cơ sở dữ liệu MySQL gồm địa chỉ máy chủ, tài khoản, mật khẩu, tên cơ sở dữ liệu và kiểu con trỏ trả về dạng từ điển (DictCursor).
+
+client = genai.Client(api_key="..."): Khởi tạo đối tượng khách hàng Gemini Client với khóa xác thực (API Key) được cung cấp.
+
+def get_db_connection():: Định nghĩa một hàm tiện ích giúp mở và trả về một kết nối mới tới cơ sở dữ liệu MySQL dựa trên cấu hình DB_CONFIG.
+
+@app.route('/api/chat', methods=['POST']): Định nghĩa tuyến đường (route) API tại địa chỉ /api/chat chỉ chấp nhận phương thức HTTP POST.
+
+def chat_endpoint():: Khai báo hàm xử lý logic chính mỗi khi có yêu cầu (request) gửi vào đường dẫn /api/chat.
+
+data = request.json: Trích xuất toàn bộ dữ liệu định dạng JSON mà phía Frontend gửi lên trong phần Body của request.
+
+user_message = data.get("message"): Lấy ra nội dung tin nhắn của người dùng thông qua khóa message.
+
+conversation_id = data.get("conversation_id"): Lấy ra mã định danh phiên chat hiện tại nếu người dùng đã có từ các lượt trước.
+
+if not user_message: return jsonify(...), 400: Kiểm tra nếu thiếu tin nhắn thì lập tức trả về mã lỗi 400 Bad Request kèm thông báo.
+
+connection = get_db_connection(): Gọi hàm để mở kết nối đến cơ sở dữ liệu MySQL.
+
+try: ... except Exception as e: ... finally: ...: Cấu trúc khối lệnh bẫy lỗi giúp đảm bảo chương trình không bị crash và luôn đóng kết nối database an toàn.
+
+with connection.cursor() as cursor:: Tạo một con trỏ cơ sở dữ liệu bên trong khối lệnh quản lý ngữ cảnh để thực thi các câu lệnh SQL.
+
+if not conversation_id:: Kiểm tra nếu chưa có mã phiên chat nghĩa là đây là cuộc hội thoại hoàn toàn mới.
+
+cursor.execute("INSERT INTO conversations ...", ...): Thực thi câu lệnh SQL tạo một dòng mới trong bảng conversations, lấy 30 ký tự đầu của tin nhắn làm tiêu đề.
+
+connection.commit(): Xác nhận lưu thay đổi (commit) dữ liệu phiên chat vào cơ sở dữ liệu.
+
+conversation_id = cursor.lastrowid: Lấy ra mã ID tự tăng vừa được tạo ra cho phiên chat mới này.
+
+cursor.execute("INSERT INTO messages ...", ...): Lưu tin nhắn của người dùng vào bảng messages với định dạng sender_type = 'user'.
+
+connection.commit(): Xác nhận lưu tin nhắn của người dùng vào database.
+
+cursor.execute("SELECT sender_type, content FROM messages WHERE conversation_id = %s ORDER BY created_at ASC", ...): Truy vấn lấy toàn bộ lịch sử tin nhắn của phiên chat hiện tại theo thứ tự thời gian tăng dần.
+
+db_messages = cursor.fetchall(): Lấy toàn bộ kết quả truy vấn lịch sử chat lưu vào biến db_messages.
+
+history = []: Khởi tạo một danh sách trống để lưu cấu trúc lịch sử trò chuyện chuẩn theo yêu cầu của Gemini SDK.
+
+for msg in db_messages[:-1]:: Duyệt qua danh sách tin nhắn cũ, ngoại trừ tin nhắn mới nhất vừa gửi.
+
+role = "user" if msg['sender_type'] == 'user' else "model": Ánh xạ phân quyền người gửi từ cơ sở dữ liệu sang định dạng role của Gemini (user hoặc model).
+
+history.append({ "role": role, "parts": [{"text": msg['content']}] }): Đưa từng tin nhắn vào mảng history theo đúng cấu trúc yêu cầu.
+
+chat = client.chats.create(...): Khởi tạo phiên trò chuyện nhiều lượt (stateful chat) với mô hình gemini-3.6-flash, kèm theo lịch sử cũ.
+
+config=types.GenerateContentConfig(system_instruction=...): Truyền cấu hình nhân cách thông qua system_instruction để định hình bot thành trợ lý LMS.
+
+response = chat.send_message(user_message): Gửi tin nhắn mới của người dùng vào phiên chat và nhận về phản hồi từ AI.
+
+model_reply = response.text: Trích xuất chuỗi văn bản câu trả lời từ đối tượng phản hồi của AI.
+
+with connection.cursor() as cursor: ...: Mở con trỏ mới để thực hiện lưu câu trả lời của AI.
+
+cursor.execute("INSERT INTO messages ...", ...): Lưu câu trả lời của AI vào bảng messages với sender_type = 'model'.
+
+connection.commit(): Xác nhận lưu phản hồi của AI vào database.
+
+return jsonify({ "status": "success", "conversation_id": conversation_id, "reply": model_reply }): Đóng gói kết quả thành công dưới dạng JSON gửi trả lại cho Frontend.
+
+except Exception as e: return jsonify({"error": str(e)}), 500: Bắt mọi lỗi phát sinh trong quá trình xử lý và trả về mã lỗi 500 Internal Server Error.
+
+finally: connection.close(): Đảm bảo kết nối database luôn được đóng lại dù thành công hay thất bại.
+
+if __name__ == '__main__':: Điều kiện kiểm tra xem file Python có đang được chạy trực tiếp hay không.
+
+print(...): In dòng thông báo trạng thái khởi động server ra màn hình console.
+
+app.run(debug=True, port=5000): Khởi chạy ứng dụng web Flask trên cổng 5000 ở chế độ gỡ lỗi (debug mode).
